@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -37,9 +38,19 @@ int main(int argc, char** argv) {
     char buffer;
 
     // Wait for client connection
+    printf("Waiting for client...\n");
+    fflush(stdout);
     int bytes_recvd = recvfrom(sockfd, &buffer, sizeof(buffer), MSG_PEEK,
                                (struct sockaddr*) &client_addr, &s);
+    if (bytes_recvd < 0) exit(1);
+    char* client_ip = inet_ntoa(client_addr.sin_addr);
+    int client_port = ntohs(client_addr.sin_port);
+    printf("Client found!\n");
+    fflush(stdout);
 
+    int flags = fcntl(sockfd, F_GETFL);
+    flags |= O_NONBLOCK;
+    fcntl(sockfd, F_SETFL, flags);
     init_io();
     listen_loop(sockfd, &client_addr, SERVER, input_io, output_io);
 

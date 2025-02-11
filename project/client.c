@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 int main(int argc, char** argv) {
     if (argc < 3) {
@@ -17,6 +18,10 @@ int main(int argc, char** argv) {
     /* Create sockets */
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     // use IPv4  use UDP
+
+    int flags = fcntl(sockfd, F_GETFL);
+    flags |= O_NONBLOCK;
+    fcntl(sockfd, F_SETFL, flags);
 
     /* Construct server address */
     struct sockaddr_in server_addr;
@@ -29,6 +34,11 @@ int main(int argc, char** argv) {
     server_addr.sin_port = htons(PORT); // Big endian
 
     init_io();
+    // char init[] = "Requesting connection...\n";
+    // fflush(stdout);
+    // int did_send = sendto(sockfd, init, strlen(init),
+    //                         0, (struct sockaddr*) &server_addr,
+    //                         sizeof(server_addr));
     listen_loop(sockfd, &server_addr, CLIENT, input_io, output_io);
 
     return 0;
