@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include "io.h"
@@ -28,17 +27,17 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
             output_p(p->payload, p->length);
         }
 
-        int n = input_p(buffer, 1024);
-        if (n > 0) {
-            char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
-            packet* pkt = (packet*) buf;
-            pkt->flags = SYN;
-            const char* msg = "Hello Mr. Server";
-            pkt->length = 17;
-            memcpy(pkt->payload, msg, pkt->length);
-            ssize_t did_send = sendto(sockfd, pkt, sizeof(packet) + MAX_PAYLOAD,
-                                        0, (struct sockaddr*) addr,
-                                        addr_size);
-        }
+        // int n = input_p(buffer, 1024);
+        // if (n > 0) {
+        //     char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
+        //     packet* pkt = (packet*) buf;
+        //     pkt->flags = SYN;
+        //     const char* msg = "Hello Mr. Server";
+        //     pkt->length = 17;
+        //     memcpy(pkt->payload, msg, pkt->length);
+        //     ssize_t did_send = sendto(sockfd, pkt, sizeof(packet) + MAX_PAYLOAD,
+        //                                 0, (struct sockaddr*) addr,
+        //                                 addr_size);
+        // }
     }
 }

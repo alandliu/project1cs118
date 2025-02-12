@@ -40,13 +40,16 @@ int main(int argc, char** argv) {
     // Wait for client connection
     printf("Waiting for client...\n");
     fflush(stdout);
-    int bytes_recvd = recvfrom(sockfd, &buffer, sizeof(buffer), MSG_PEEK,
+    char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
+    int bytes_recvd = recvfrom(sockfd, &buf, sizeof(buffer), MSG_PEEK,
                                (struct sockaddr*) &client_addr, &s);
     if (bytes_recvd < 0) exit(1);
     char* client_ip = inet_ntoa(client_addr.sin_addr);
     int client_port = ntohs(client_addr.sin_port);
+    packet* recv_syn = (packet*) buf;
     printf("Client found!\n");
     fflush(stdout);
+    output_io(recv_syn->payload, recv_syn->length);
 
     int flags = fcntl(sockfd, F_GETFL);
     flags |= O_NONBLOCK;
