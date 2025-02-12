@@ -37,16 +37,24 @@ int main(int argc, char** argv) {
     char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
     packet* syn_pkt = (packet*) buf;
     syn_pkt->flags = SYN;
-    syn_pkt->seq = (int16_t) rand();
+    syn_pkt->seq = htons(rand() % (1 << 15));
     char message[MAX_PAYLOAD] = {0};
     int n = input_io((uint8_t*)message, MAX_PAYLOAD);
     if (n > 0) {
         memcpy(syn_pkt->payload, message, n);
-        memcpy(syn_pkt->payload, message, strlen(message));
         syn_pkt->length = strlen(message);
     }
     sendto(sockfd, syn_pkt, sizeof(packet) + MAX_PAYLOAD, 0, (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
     print("Syn sent");
+
+    // wait for syn-ack
+    print("Awaiting SYN-ACK");
+    char recv_buf[sizeof(packet) + MAX_PAYLOAD] = {0};
+    socklen_t s = sizeof(struct sockaddr_in);
+    int bytes_recvd = recvfrom(sockfd, &recv_buf, sizeof(recv_buf), 0, (struct sockaddr*) &server_addr, &s);
+    packet* recv_sa_pkt = (packet*) recv_buf;
+    print("Received SYN-ACK");
+    print_diag(recv_sa_pkt, RECV);
     
     // nonblock socket
     int flags = fcntl(sockfd, F_GETFL);

@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -38,18 +39,27 @@ int main(int argc, char** argv) {
     char buffer;
 
     // Wait for client connection
-    printf("Waiting for client...\n");
-    fflush(stdout);
+    srand(time(NULL));
+    print("Waiting for client...");
     char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
-    int bytes_recvd = recvfrom(sockfd, &buf, sizeof(buffer), MSG_PEEK,
+    int bytes_recvd = recvfrom(sockfd, &buf, sizeof(packet) + MAX_PAYLOAD, 0,
                                (struct sockaddr*) &client_addr, &s);
     if (bytes_recvd < 0) exit(1);
     char* client_ip = inet_ntoa(client_addr.sin_addr);
     int client_port = ntohs(client_addr.sin_port);
     packet* recv_syn = (packet*) buf;
-    printf("Client found!\n");
-    fflush(stdout);
-    output_io(recv_syn->payload, recv_syn->length);
+    print("Client found!");
+    print_diag(recv_syn, RECV);
+    output_io(recv_syn->payload, ntohs(recv_syn->length));
+
+    // send syn-ack
+    char send_buf[sizeof(packet) + MAX_PAYLOAD] = {0};
+    packet* syn_ack_pkt = (packet*) send_buf;
+    syn_ack_pkt->flags = SYN + ACK;
+    syn_ack_pkt->seq = htons(rand());
+    syn_ack_pkt->ack = htons(ntohs(recv_syn->seq) + 1);
+    sendto(sockfd, syn_ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
+    print("SYN-ACK sent");
 
     int flags = fcntl(sockfd, F_GETFL);
     flags |= O_NONBLOCK;
