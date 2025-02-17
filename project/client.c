@@ -32,30 +32,47 @@ int main(int argc, char** argv) {
 
     // Client initiates three-way handshake
     init_io();
-    print("Initiating handshake.");
+    // print("Initiating handshake.");
     srand(time(NULL));
-    char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
-    packet* syn_pkt = (packet*) buf;
+    char send_buf[sizeof(packet) + MAX_PAYLOAD] = {0};
+    packet* syn_pkt = (packet*) send_buf;
     syn_pkt->flags = SYN;
-    syn_pkt->seq = htons(rand() % (1 << 15));
+    syn_pkt->seq = htons(rand() % (1 << 10));
     char message[MAX_PAYLOAD] = {0};
     int n = input_io((uint8_t*)message, MAX_PAYLOAD);
     if (n > 0) {
         memcpy(syn_pkt->payload, message, n);
-        syn_pkt->length = strlen(message);
+        syn_pkt->length = htons(n);
     }
-    sendto(sockfd, syn_pkt, sizeof(packet) + MAX_PAYLOAD, 0, (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
-    print("Syn sent");
+    print_diag(syn_pkt, SEND);
+    sendto(sockfd, syn_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
+            (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
+    // print("Syn sent");
 
     // wait for syn-ack
-    print("Awaiting SYN-ACK");
+    // print("Awaiting SYN-ACK");
     char recv_buf[sizeof(packet) + MAX_PAYLOAD] = {0};
     socklen_t s = sizeof(struct sockaddr_in);
     int bytes_recvd = recvfrom(sockfd, &recv_buf, sizeof(recv_buf), 0, (struct sockaddr*) &server_addr, &s);
     packet* recv_sa_pkt = (packet*) recv_buf;
-    print("Received SYN-ACK");
+    // print("Received SYN-ACK");
     print_diag(recv_sa_pkt, RECV);
-    
+
+    // send first ACK packet, with or without data
+    memset(send_buf, 0, sizeof(packet) + MAX_PAYLOAD);
+    packet* ack_pkt = (packet*) send_buf;
+    ack_pkt->flags = ACK;
+    ack_pkt->seq = htons(ntohs(recv_sa_pkt->ack));
+    ack_pkt->ack = htons(ntohs(recv_sa_pkt->seq) + 1);
+    n = input_io((uint8_t*)message, MAX_PAYLOAD);
+    if (n > 0) {
+        memcpy(ack_pkt->payload, message, n);
+        ack_pkt->length = htons(n);
+    }
+    print_diag(syn_pkt, SEND);
+    sendto(sockfd, ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
+            (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
+
     // nonblock socket
     int flags = fcntl(sockfd, F_GETFL);
     flags |= O_NONBLOCK;

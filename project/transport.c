@@ -10,34 +10,24 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                  void (*output_p)(uint8_t*, size_t)) {
 
     while (true) {
-        uint8_t buffer[1024];
+        uint8_t buffer[sizeof(packet) + MAX_PAYLOAD] = {0};
         socklen_t addr_size = sizeof(struct sockaddr_in);
 
-        char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
-        packet* p = (packet*) buf;
-        int bytes_recvd = recvfrom(sockfd, p, sizeof(packet) + MAX_PAYLOAD,
+        int bytes_recvd = recvfrom(sockfd, buffer, 1024,
                                     0, (struct sockaddr*) addr, 
                                     &addr_size);
+        packet* rcv_packet = (packet*) buffer;
         if (bytes_recvd > 0) {
-            printf("SYN: %d\n", p->flags & 1);
-            printf("ACK: %d\n", (p->flags >> 1) & 1);
-            printf("PAR: %d\n", (p->flags >> 2) & 1);
-            printf("PACKET SIZE OF: %d\n", p->length);
-            print_diag(p, RECV);
-            output_p(p->payload, p->length);
+            print_diag(rcv_packet, RECV);
+            output_p(rcv_packet->payload, ntohs(rcv_packet->length));
         }
 
-        // int n = input_p(buffer, 1024);
-        // if (n > 0) {
-        //     char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
-        //     packet* pkt = (packet*) buf;
-        //     pkt->flags = SYN;
-        //     const char* msg = "Hello Mr. Server";
-        //     pkt->length = 17;
-        //     memcpy(pkt->payload, msg, pkt->length);
-        //     ssize_t did_send = sendto(sockfd, pkt, sizeof(packet) + MAX_PAYLOAD,
-        //                                 0, (struct sockaddr*) addr,
-        //                                 addr_size);
-        // }
+        memset(buffer, 0, sizeof(packet) + MAX_PAYLOAD);
+        packet* send_pkt = (packet*) buffer;
+        int n = input_p(buffer, 1024);
+        if (n > 0) {
+            sendto(sockfd, buffer, n, 0, 
+                (struct sockaddr*) addr, addr_size);
+        }
     }
 }
