@@ -30,7 +30,6 @@ int main(int argc, char** argv) {
     int PORT = atoi(argv[2]);
     server_addr.sin_port = htons(PORT); // Big endian
 
-    // Client initiates three-way handshake
     init_io();
     listen_loop(sockfd, &server_addr, CLIENT, input_io, output_io);
 
