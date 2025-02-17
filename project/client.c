@@ -57,6 +57,7 @@ int main(int argc, char** argv) {
     packet* recv_sa_pkt = (packet*) recv_buf;
     // print("Received SYN-ACK");
     print_diag(recv_sa_pkt, RECV);
+    output_io(recv_sa_pkt->payload, ntohs(recv_sa_pkt->length));
 
     // send first ACK packet, with or without data
     memset(send_buf, 0, sizeof(packet) + MAX_PAYLOAD);
@@ -68,6 +69,8 @@ int main(int argc, char** argv) {
     if (n > 0) {
         memcpy(ack_pkt->payload, message, n);
         ack_pkt->length = htons(n);
+    } else if (n == 0) {
+        ack_pkt->seq = htons(0);
     }
     print_diag(syn_pkt, SEND);
     sendto(sockfd, ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 

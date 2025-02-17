@@ -40,6 +40,7 @@ int main(int argc, char** argv) {
     char buffer;
 
     // Wait for client connection
+    init_io();
     srand(time(NULL));
     // print("Waiting for client...");
     char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
@@ -73,7 +74,6 @@ int main(int argc, char** argv) {
     int flags = fcntl(sockfd, F_GETFL);
     flags |= O_NONBLOCK;
     fcntl(sockfd, F_SETFL, flags);
-    init_io();
     listen_loop(sockfd, &client_addr, SERVER, input_io, output_io);
 
     return 0;
