@@ -44,12 +44,16 @@ int main(int argc, char** argv) {
     srand(time(NULL));
     // print("Waiting for client...");
     char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
-    int bytes_recvd = recvfrom(sockfd, &buf, sizeof(packet) + MAX_PAYLOAD, 0,
+    int syn_rcvd = 0;
+    packet* recv_syn = (packet*) buf;
+    while (!syn_rcvd) {
+        int bytes_recvd = recvfrom(sockfd, &buf, sizeof(packet) + MAX_PAYLOAD, 0,
                                (struct sockaddr*) &client_addr, &s);
-    if (bytes_recvd < 0) exit(1);
+        if (bytes_recvd < 0) exit(1);
+        if (recv_syn->flags & 1) syn_rcvd = 1;
+    }
     char* client_ip = inet_ntoa(client_addr.sin_addr);
     int client_port = ntohs(client_addr.sin_port);
-    packet* recv_syn = (packet*) buf;
     // print("Client found!");
     print_diag(recv_syn, RECV);
     output_io(recv_syn->payload, ntohs(recv_syn->length));
