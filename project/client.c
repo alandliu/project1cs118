@@ -73,6 +73,8 @@ int main(int argc, char** argv) {
         ack_pkt->seq = htons(0);
     }
     print_diag(syn_pkt, SEND);
+    int16_t initial_seq = ntohs(syn_pkt->seq) + 1;
+    int16_t cum_ack = ntohs(recv_sa_pkt->seq);
     sendto(sockfd, ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
             (struct sockaddr*) &server_addr, sizeof(struct sockaddr_in));
 

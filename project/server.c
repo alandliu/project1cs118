@@ -40,6 +40,7 @@ int main(int argc, char** argv) {
     char buffer;
 
     // Wait for client connection
+    // the cumulative ACK before entering the listen loop is the SEQ of the last received packet
     init_io();
     srand(time(NULL));
     // print("Waiting for client...");
@@ -71,6 +72,8 @@ int main(int argc, char** argv) {
         syn_ack_pkt->length = htons(n);
     }
     print_diag(syn_ack_pkt, SEND);
+    int16_t initial_seq = ntohs(syn_ack_pkt->seq) + 1;
+    int16_t cum_ack = ntohs(recv_syn->seq);
     sendto(sockfd, syn_ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
             (struct sockaddr*) &client_addr, sizeof(struct sockaddr_in));
     // print("SYN-ACK sent");
