@@ -11,36 +11,42 @@
 #include <time.h>
 void parity(packet* pkt) {
     uint8_t hold = 0;
-    uint8_t* data = (uint8_t*) pkt;
-    for (int i = 0; i < sizeof(*pkt); i++) {  
+   
+    uint8_t* bytes = (uint8_t*) pkt;
+    int len = sizeof(packet) + MAX_PAYLOAD;
+
+    for (int i = 0; i < len; i++) {
+        uint8_t val = bytes[i];
         for (int j = 0; j < 8; j++) {
-            hold ^= (data[i] >> j) & 1;
-        }
+            hold ^= (val >> j) & 1;
+         }
+        
     }
     if (hold == 1) {
         pkt->flags |= PARITY;
     }
     return;
 }
-int parity_check(packet* pkt){
+int check_parity(packet* pkt) {
     uint8_t hold = 0;
-    uint8_t* data = (uint8_t*) pkt;
-    for (int i = 0; i < sizeof(*pkt); i++) {  
+   
+    uint8_t* bytes = (uint8_t*) pkt;
+    int len = sizeof(packet) + MAX_PAYLOAD;
+
+    for (int i = 0; i < len; i++) {
+        uint8_t val = bytes[i];
         for (int j = 0; j < 8; j++) {
-            hold ^= (data[i] >> j) & 1;
-        }
+            hold ^= (val >> j) & 1;
+         }
+        
     }
     if (hold == 1) {
-        return 1;
+        return -1;
     }
     return 0;
 }
 int main(int argc, char** argv) {
-    char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
-packet* p = (packet*) buf;
-parity(buf);
-printf("Parity bit: %d\n", (p->flags >> 2) & 1);
-fflush(stdout);
+    
     if (argc < 2) {
         fprintf(stderr, "Usage: server <port>\n");
         exit(1);
