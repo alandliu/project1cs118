@@ -7,8 +7,8 @@
 #include "consts.h"
 
 void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
-    ssize_t (*input_p)(uint8_t*, size_t),
-    void (*output_p)(uint8_t*, size_t)) {
+    ssize_t (*input_p)(uint8_t*, size_t), void (*output_p)(uint8_t*, size_t), 
+    int16_t* next_seq, int16_t* cum_ack) {
         srand(time(NULL));
         if (type == CLIENT) {
             char send_buf[sizeof(packet) + MAX_PAYLOAD] = {0};
@@ -46,9 +46,11 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             } else if (n == 0) {
                 ack_pkt->seq = htons(0);
             }
-            print_diag(syn_pkt, SEND);
+            print_diag(ack_pkt, SEND);
             sendto(sockfd, ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
                     (struct sockaddr*) addr, sizeof(struct sockaddr_in));
+            *next_seq = ntohs(ack_pkt->seq) + 1; // next seq number to send
+            *cum_ack = ntohs(recv_sa_pkt->seq); // last received ack
         } else if (type == SERVER) {
             char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
             int syn_rcvd = 0;
@@ -80,7 +82,15 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             print_diag(syn_ack_pkt, SEND);
             sendto(sockfd, syn_ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
                     (struct sockaddr*) addr, sizeof(struct sockaddr_in));
-            // print("SYN-ACK sent");
+            
+            // receive client ACK
+            memset(buf, 0, sizeof(packet) + MAX_PAYLOAD);
+            packet* rcv_ack = (packet*) buf;
+            int bytes_recvd = recvfrom(sockfd, &buf, sizeof(packet) + MAX_PAYLOAD,
+                                        0, (struct sockaddr*) addr, &s);
+            print_diag(rcv_ack, RECV);
+            *next_seq = ntohs(syn_ack_pkt->seq) + 1;
+            *cum_ack = ntohs(rcv_ack->seq);
         }
 }
 
@@ -90,14 +100,18 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                  void (*output_p)(uint8_t*, size_t)) {
 
     // initiate connection
-    three_way_hs(sockfd, addr, type, input_p, output_p);
+    // next seq is the next sequence number that should be reecived
+    // cum ack is the last byte that has been acked of the sender
+    int16_t next_seq, cum_ack;
+    three_way_hs(sockfd, addr, type, input_p, output_p, &next_seq, &cum_ack);
 
     // unblock the socket
     int flags = fcntl(sockfd, F_GETFL);
     flags |= O_NONBLOCK;
     fcntl(sockfd, F_SETFL, flags);
 
-
+    printf("Next seq will be %d\n", next_seq);
+    printf("Acked up to %d\n", cum_ack);
     // loop
     while (true) {
         uint8_t buffer[sizeof(packet) + MAX_PAYLOAD] = {0};
