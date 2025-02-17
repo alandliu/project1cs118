@@ -23,13 +23,12 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             }
             print_diag(syn_pkt, SEND);
             sendto(sockfd, syn_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
-                    (struct sockaddr*) &addr, sizeof(struct sockaddr_in));
-            // print("Syn sent");
+                    (struct sockaddr*) addr, sizeof(struct sockaddr_in));
 
             // wait for syn-ack
             char recv_buf[sizeof(packet) + MAX_PAYLOAD] = {0};
             socklen_t s = sizeof(struct sockaddr_in);
-            int bytes_recvd = recvfrom(sockfd, &recv_buf, sizeof(recv_buf), 0, (struct sockaddr*) &addr, &s);
+            int bytes_recvd = recvfrom(sockfd, &recv_buf, sizeof(recv_buf), 0, (struct sockaddr*) addr, &s);
             packet* recv_sa_pkt = (packet*) recv_buf;
             print_diag(recv_sa_pkt, RECV);
             output_io(recv_sa_pkt->payload, ntohs(recv_sa_pkt->length));
@@ -49,19 +48,17 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             }
             print_diag(syn_pkt, SEND);
             sendto(sockfd, ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
-                    (struct sockaddr*) &addr, sizeof(struct sockaddr_in));
-        } else {
-            srand(time(NULL));
-            // print("Waiting for client...");
+                    (struct sockaddr*) addr, sizeof(struct sockaddr_in));
+        } else if (type == SERVER) {
             char buf[sizeof(packet) + MAX_PAYLOAD] = {0};
             int syn_rcvd = 0;
+            socklen_t s = sizeof(struct sockaddr_in);
             packet* recv_syn = (packet*) buf;
             while (!syn_rcvd) {
-                socklen_t s = sizeof(struct sockaddr_in);
                 int bytes_recvd = recvfrom(sockfd, &buf, sizeof(packet) + MAX_PAYLOAD, 0,
-                                       (struct sockaddr*) &addr, &s);
+                                       (struct sockaddr*) addr, &s);
                 if (bytes_recvd < 0) exit(1);
-                if (recv_syn->flags & 1) syn_rcvd = 1;
+                syn_rcvd = recv_syn->flags & 1;
             }
             char* client_ip = inet_ntoa(addr->sin_addr);
             int client_port = ntohs(addr->sin_port);
@@ -81,10 +78,8 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
                 syn_ack_pkt->length = htons(n);
             }
             print_diag(syn_ack_pkt, SEND);
-            int16_t initial_seq = ntohs(syn_ack_pkt->seq) + 1;
-            int16_t cum_ack = ntohs(recv_syn->seq);
             sendto(sockfd, syn_ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
-                    (struct sockaddr*) &addr, sizeof(struct sockaddr_in));
+                    (struct sockaddr*) addr, sizeof(struct sockaddr_in));
             // print("SYN-ACK sent");
         }
 }

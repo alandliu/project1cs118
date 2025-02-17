@@ -40,7 +40,6 @@ int main(int argc, char** argv) {
     char buffer;
 
     // Wait for client connection
-    // the cumulative ACK before entering the listen loop is the SEQ of the last received packet
     init_io();
     listen_loop(sockfd, &client_addr, SERVER, input_io, output_io);
 
