@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 
 int main(int argc, char** argv) {
     if (argc < 3) {
@@ -18,10 +19,6 @@ int main(int argc, char** argv) {
     /* Create sockets */
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     // use IPv4  use UDP
-
-    int flags = fcntl(sockfd, F_GETFL);
-    flags |= O_NONBLOCK;
-    fcntl(sockfd, F_SETFL, flags);
 
     /* Construct server address */
     struct sockaddr_in server_addr;
