@@ -7,6 +7,8 @@
 #include "io.h"
 #include "consts.h"
 
+#define MAX_PACKET_SIZE MAX_PAYLOAD + sizeof(packet)
+
 void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
     ssize_t (*input_p)(uint8_t*, size_t), void (*output_p)(uint8_t*, size_t), 
     int16_t* next_seq, int16_t* cum_ack) {
@@ -103,8 +105,9 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
     // initiate connection
     // next seq is the next sequence number that should be reecived
     // cum ack is the last byte that has been acked of the sender
-    int16_t next_seq, cum_ack;
-    three_way_hs(sockfd, addr, type, input_p, output_p, &next_seq, &cum_ack);
+    int16_t init_seq, next_seq, cum_ack, init_ack;
+    three_way_hs(sockfd, addr, type, input_p, output_p, &init_seq, &cum_ack);
+    next_seq = init_seq; init_ack = cum_ack;
 
     // unblock the socket
     int flags = fcntl(sockfd, F_GETFL);
@@ -117,45 +120,52 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
     // init buffers
     // note:
     // 1. buffers account for headers, and must be stored
-    // 2. flow control integer does not count header sie
-    int8_t sending_buf[(sizeof(packet) + MAX_PAYLOAD) * 40] = {0};
-    int8_t receiving_buf[(sizeof(packet) + MAX_PAYLOAD) * 40] = {0};
-    int max_buffer_size = MIN_WINDOW;
+    // 2. flow control integer does not count header size
+    int8_t sending_buf[MAX_PACKET_SIZE * 40];
+    int8_t receiving_buf[MAX_PACKET_SIZE * 40];
+    int cur_win_size = MAX_WINDOW;
+    int max_buffer_size = MAX_WINDOW;
     int cur_buffer_size = 0;
     // loop
     while (true) {
-        uint8_t rcv_buffer[sizeof(packet) + MAX_PAYLOAD] = {0};
-        uint8_t snd_buffer[sizeof(packet) + MAX_PAYLOAD] = {0};
+        uint8_t rcv_buffer[MAX_PACKET_SIZE] = {0};
+        uint8_t snd_buffer[MAX_PACKET_SIZE] = {0};
         uint8_t msg[MAX_PAYLOAD] = {0};
         uint8_t ack_data = 0;
         socklen_t addr_size = sizeof(struct sockaddr_in);
 
-        int bytes_recvd = recvfrom(sockfd, rcv_buffer, 1024,
+        int bytes_recvd = recvfrom(sockfd, rcv_buffer, sizeof(packet) + MAX_PAYLOAD,
                                     0, (struct sockaddr*) addr, 
                                     &addr_size);
         packet* rcv_pkt = (packet*) rcv_buffer;
         if (bytes_recvd > 0) {
+            // TODO: verify packet integrity
+            printf("CUM ACK: %d\n", cum_ack);
             print_diag(rcv_pkt, RECV);
-            // if packet is an ACK packet with data, we must ACK it
-            if (ntohs(rcv_pkt->length)) {
-                ack_data = 1;
-                // TODO: check if received sequence <= cum ack. if so we don't print
-                output_p(rcv_pkt->payload, ntohs(rcv_pkt->length));
-            }
-            // if the sequence is next to ACK, we ACK up to that
-            if (ntohs(rcv_pkt->seq) == cum_ack+1) {
+            int16_t s_num = ntohs(rcv_pkt->seq);
+            int16_t a_num = ntohs(rcv_pkt->ack); // ack our sending buffer
+            int16_t len = ntohs(rcv_pkt->length);
+            max_buffer_size = ntohs(rcv_pkt->win); // set win size
+            // if packet is an ACK packet with data (length > 0), we must ACK it
+
+            if (s_num == cum_ack + 1) {
                 cum_ack++;
             }
-            // TODO: if received sequence > cum ack, buffer it
-            // otherwise if received sequence < cum ack, resend same ack
+            if (len > 0) {
+                ack_data = 1;
+                output_p(rcv_pkt->payload, len);
+                // if the sequence is next to ACK, we ACK up to that 
+            }
         }
 
-        int n = input_p(msg, MAX_PAYLOAD);
+        // read only as much as there is flow control
+        int n = input_p(msg, MIN(MAX_PAYLOAD, max_buffer_size - cur_buffer_size));
         if (n > 0 || ack_data) {
             memset(snd_buffer, 0, sizeof(packet) + MAX_PAYLOAD);
             packet* snd_pkt = (packet*) snd_buffer;
             snd_pkt->seq = htons(next_seq);
             snd_pkt->ack = htons(cum_ack);
+            snd_pkt->win = htons(cur_win_size);
             snd_pkt->flags = ACK;
             memcpy(snd_pkt->payload, msg, n);
             snd_pkt->length = htons(n);
@@ -164,6 +174,7 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                 (struct sockaddr*) addr, addr_size);
             next_seq++;
             ack_data = 0;
+            cur_buffer_size += n;
         }
     }
 }
