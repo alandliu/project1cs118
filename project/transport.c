@@ -99,6 +99,9 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             packet* rcv_ack = (packet*) buf;
             int bytes_recvd = recvfrom(sockfd, &buf, sizeof(packet) + MAX_PAYLOAD,
                                         0, (struct sockaddr*) addr, &s);
+            if (ntohs(rcv_ack->length)) {
+                output_p(rcv_ack->payload, ntohs(rcv_ack->length));
+            }
             print_diag(rcv_ack, RECV);
             *next_seq = ntohs(syn_ack_pkt->seq) + 1;
             *cum_ack = ntohs(rcv_ack->seq) + 1;
