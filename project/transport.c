@@ -24,6 +24,7 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
                 memcpy(syn_pkt->payload, message, n);
                 syn_pkt->length = htons(n);
             }
+            set_parity(syn_pkt);
             print_diag(syn_pkt, SEND);
             sendto(sockfd, syn_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
                     (struct sockaddr*) addr, sizeof(struct sockaddr_in));
@@ -49,6 +50,7 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             } else if (n == 0) {
                 ack_pkt->seq = htons(0);
             }
+            set_parity(ack_pkt);
             print_diag(ack_pkt, SEND);
             sendto(sockfd, ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
                     (struct sockaddr*) addr, sizeof(struct sockaddr_in));
@@ -82,6 +84,7 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
                 memcpy(syn_ack_pkt->payload, message, n);
                 syn_ack_pkt->length = htons(n);
             }
+            set_parity(syn_ack_pkt);
             print_diag(syn_ack_pkt, SEND);
             sendto(sockfd, syn_ack_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
                     (struct sockaddr*) addr, sizeof(struct sockaddr_in));
@@ -95,6 +98,41 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             *next_seq = ntohs(syn_ack_pkt->seq) + 1;
             *cum_ack = ntohs(rcv_ack->seq);
         }
+}
+
+void set_parity(packet* pkt) {
+    uint8_t hold = 0;
+   
+    uint8_t* bytes = (uint8_t*) pkt;
+    int len = sizeof(packet) + MAX_PAYLOAD;
+
+    for (int i = 0; i < len; i++) {
+        uint8_t val = bytes[i];
+        for (int j = 0; j < 8; j++) {
+            hold ^= (val >> j) & 1;
+         }
+        
+    }
+    if (hold == 1) {
+        pkt->flags |= PARITY;
+    }
+}
+
+int check_parity(packet* pkt) {
+    uint8_t hold = 0;
+   
+    uint8_t* bytes = (uint8_t*) pkt;
+    int len = sizeof(packet) + MAX_PAYLOAD;
+
+    for (int i = 0; i < len; i++) {
+        uint8_t val = bytes[i];
+        for (int j = 0; j < 8; j++) {
+            hold ^= (val >> j) & 1;
+         }
+        
+    }
+    
+    return hold == 0;
 }
 
 // Main function of transport layer; never quits
@@ -139,22 +177,23 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                                     &addr_size);
         packet* rcv_pkt = (packet*) rcv_buffer;
         if (bytes_recvd > 0) {
-            // TODO: verify packet integrity
-            printf("CUM ACK: %d\n", cum_ack);
-            print_diag(rcv_pkt, RECV);
-            int16_t s_num = ntohs(rcv_pkt->seq);
-            int16_t a_num = ntohs(rcv_pkt->ack); // ack our sending buffer
-            int16_t len = ntohs(rcv_pkt->length);
-            max_buffer_size = ntohs(rcv_pkt->win); // set win size
-            // if packet is an ACK packet with data (length > 0), we must ACK it
+            if (check_parity(rcv_pkt)) {
+                print_diag(rcv_pkt, RECV);
+                int16_t s_num = ntohs(rcv_pkt->seq);
+                int16_t a_num = ntohs(rcv_pkt->ack); // ack our sending buffer
+                int16_t len = ntohs(rcv_pkt->length);
+                max_buffer_size = ntohs(rcv_pkt->win); // set win size
 
-            if (s_num == cum_ack + 1) {
-                cum_ack++;
-            }
-            if (len > 0) {
-                ack_data = 1;
-                output_p(rcv_pkt->payload, len);
                 // if the sequence is next to ACK, we ACK up to that 
+                if (s_num == cum_ack + 1) {
+                    cum_ack++;
+                    // if packet is an ACK packet with data (length > 0), we must ACK it
+                    if (len > 0) {
+                        ack_data = 1;
+                        output_p(rcv_pkt->payload, len);
+                    }
+                } // if received s_num less than cum ack, ack with cum ack
+                // if received s_num is greater than cum ack, buffer it
             }
         }
 
@@ -169,6 +208,9 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
             snd_pkt->flags = ACK;
             memcpy(snd_pkt->payload, msg, n);
             snd_pkt->length = htons(n);
+
+            set_parity(snd_pkt); // must be last
+
             print_diag(snd_pkt, SEND);
             sendto(sockfd, snd_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
                 (struct sockaddr*) addr, addr_size);
