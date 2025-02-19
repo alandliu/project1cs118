@@ -10,6 +10,40 @@
 
 #define MAX_PACKET_SIZE MAX_PAYLOAD + sizeof(packet)
 
+void set_parity(packet* pkt) {
+    uint8_t hold = 0;
+   
+    uint8_t* bytes = (uint8_t*) pkt;
+    int len = sizeof(packet) + MIN(MAX_PAYLOAD, ntohs(pkt->length));
+
+    for (int i = 0; i < len; i++) {
+        uint8_t val = bytes[i];
+        for (int j = 0; j < 8; j++) {
+            hold ^= (val >> j) & 1;
+         }
+        
+    }
+    if (hold == 1) {
+        pkt->flags |= PARITY;
+    }
+}
+
+int check_parity(packet* pkt) {
+    uint8_t hold = 0;
+   
+    uint8_t* bytes = (uint8_t*) pkt;
+    int len = sizeof(packet) + MIN(MAX_PAYLOAD, ntohs(pkt->length));
+
+    for (int i = 0; i < len; i++) {
+        uint8_t val = bytes[i];
+        for (int j = 0; j < 8; j++) {
+            hold ^= (val >> j) & 1;
+         }
+        
+    }
+    return hold == 0;
+}
+
 void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
     ssize_t (*input_p)(uint8_t*, size_t), void (*output_p)(uint8_t*, size_t), 
     int16_t* next_seq, int16_t* cum_ack) {
@@ -105,39 +139,6 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
         }
 }
 
-void set_parity(packet* pkt) {
-    uint8_t hold = 0;
-   
-    uint8_t* bytes = (uint8_t*) pkt;
-    int len = sizeof(packet) + MIN(MAX_PAYLOAD, ntohs(pkt->length));
-
-    for (int i = 0; i < len; i++) {
-        uint8_t val = bytes[i];
-        for (int j = 0; j < 8; j++) {
-            hold ^= (val >> j) & 1;
-         }
-        
-    }
-    if (hold == 1) {
-        pkt->flags |= PARITY;
-    }
-}
-
-int check_parity(packet* pkt) {
-    uint8_t hold = 0;
-   
-    uint8_t* bytes = (uint8_t*) pkt;
-    int len = sizeof(packet) + MIN(MAX_PAYLOAD, ntohs(pkt->length));
-
-    for (int i = 0; i < len; i++) {
-        uint8_t val = bytes[i];
-        for (int j = 0; j < 8; j++) {
-            hold ^= (val >> j) & 1;
-         }
-        
-    }
-    return hold == 0;
-}
 
 // Main function of transport layer; never quits
 void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
