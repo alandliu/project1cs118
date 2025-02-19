@@ -28,6 +28,9 @@ void delete_packet(struct Node** head, int16_t target_seq);
 // returns falsy integer (0) if not found
 int retrieve_packet(struct Node** head, packet* t_pkt, int16_t target_seq);
 
+// retrieve head in packet format
+int retrieve_head_packet(struct Node** head, packet* t_pkt);
+
 // count payload bytes in buffer
 void count_unacked_bytes(struct Node** head, int* accumulator);
 
