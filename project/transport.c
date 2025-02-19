@@ -13,11 +13,13 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
     ssize_t (*input_p)(uint8_t*, size_t), void (*output_p)(uint8_t*, size_t), 
     int16_t* next_seq, int16_t* cum_ack) {
         srand(time(NULL));
+        int16_t window = MAX_WINDOW;
         if (type == CLIENT) {
             char send_buf[sizeof(packet) + MAX_PAYLOAD] = {0};
             packet* syn_pkt = (packet*) send_buf;
             syn_pkt->flags = SYN;
             syn_pkt->seq = htons(rand() % (1 << 10));
+            syn_pkt->win = htons(window);
             char message[MAX_PAYLOAD] = {0};
             int n = input_p((uint8_t*)message, MAX_PAYLOAD);
             if (n > 0) {
@@ -43,6 +45,7 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             ack_pkt->flags = ACK;
             ack_pkt->seq = htons(ntohs(recv_sa_pkt->ack));
             ack_pkt->ack = htons(ntohs(recv_sa_pkt->seq) + 1);
+            ack_pkt->win = htons(window);
             n = input_p((uint8_t*)message, MAX_PAYLOAD);
             if (n > 0) {
                 memcpy(ack_pkt->payload, message, n);
@@ -78,6 +81,7 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             syn_ack_pkt->flags = SYN + ACK;
             syn_ack_pkt->seq = htons(rand() % (1 << 10));
             syn_ack_pkt->ack = htons(ntohs(recv_syn->seq) + 1);
+            syn_ack_pkt->win = htons(window);
             char message[MAX_PAYLOAD] = {0};
             int n = input_p((uint8_t*)message, MAX_PAYLOAD);
             if (n > 0) {
@@ -104,7 +108,7 @@ void set_parity(packet* pkt) {
     uint8_t hold = 0;
    
     uint8_t* bytes = (uint8_t*) pkt;
-    int len = sizeof(packet) + MAX_PAYLOAD;
+    int len = sizeof(packet) + MIN(MAX_PAYLOAD, ntohs(pkt->length));
 
     for (int i = 0; i < len; i++) {
         uint8_t val = bytes[i];
@@ -122,7 +126,7 @@ int check_parity(packet* pkt) {
     uint8_t hold = 0;
    
     uint8_t* bytes = (uint8_t*) pkt;
-    int len = sizeof(packet) + MAX_PAYLOAD;
+    int len = sizeof(packet) + MIN(MAX_PAYLOAD, ntohs(pkt->length));
 
     for (int i = 0; i < len; i++) {
         uint8_t val = bytes[i];
@@ -131,7 +135,6 @@ int check_parity(packet* pkt) {
          }
         
     }
-    
     return hold == 0;
 }
 
@@ -159,8 +162,8 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
     // note:
     // 1. buffers account for headers, and must be stored
     // 2. flow control integer does not count header size
-    int8_t sending_buf[MAX_PACKET_SIZE * 40];
-    int8_t receiving_buf[MAX_PACKET_SIZE * 40];
+    // int8_t sending_buf[MAX_PACKET_SIZE * 40];
+    // int8_t receiving_buf[MAX_PACKET_SIZE * 40];
     int cur_win_size = MAX_WINDOW;
     int max_buffer_size = MAX_WINDOW;
     int cur_buffer_size = 0;
@@ -192,8 +195,13 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                         ack_data = 1;
                         output_p(rcv_pkt->payload, len);
                     }
-                } // if received s_num less than cum ack, ack with cum ack
+                } else if (s_num <= cum_ack) {
+                    // if received s_num less than cum ack, ack with cum ack
+                    ack_data = 1;
+                }
                 // if received s_num is greater than cum ack, buffer it
+            } else {
+                print("CORRUPT");
             }
         }
 
