@@ -43,5 +43,6 @@ int main() {
     print_list(&head);
 
     free_packets(&head); // Free memory
+    print_list(&head);
     return 0;
 }

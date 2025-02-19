@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include "io.h"
 #include "consts.h"
+#include "linked_list.h"
 
 #define MAX_PACKET_SIZE MAX_PAYLOAD + sizeof(packet)
 
@@ -162,8 +163,8 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
     // note:
     // 1. buffers account for headers, and must be stored
     // 2. flow control integer does not count header size
-    // int8_t sending_buf[MAX_PACKET_SIZE * 40];
-    // int8_t receiving_buf[MAX_PACKET_SIZE * 40];
+    struct Node* rcv_buffer = NULL;
+    struct Node* snd_buffer = NULL;
     int cur_win_size = MAX_WINDOW;
     int max_buffer_size = MAX_WINDOW;
     int cur_buffer_size = 0;
