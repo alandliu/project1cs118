@@ -63,6 +63,17 @@ void count_unacked_bytes(struct Node** head, int* accumulator) {
     *accumulator = total_bytes;
 }
 
+void free_up_to(struct Node** head, int16_t target_seq) {
+    struct Node* cur_node = *head;
+    // remove head elements
+    while (cur_node != NULL && cur_node->seq_num <= target_seq) {
+        struct Node* tb_free = cur_node;
+        cur_node = cur_node->next;
+        free(tb_free);
+    }
+    *head = cur_node;
+}
+
 int retrieve_packet(struct Node** head, packet* t_pkt, int16_t target_seq) {
     struct Node* cur_node = *head;
     while (cur_node != NULL && cur_node->seq_num != target_seq) {
