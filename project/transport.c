@@ -163,8 +163,8 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
     // note:
     // 1. buffers account for headers, and must be stored
     // 2. flow control integer does not count header size
-    struct Node* rcv_buffer = NULL;
-    struct Node* snd_buffer = NULL;
+    struct Node* r_buffer = NULL;
+    struct Node* s_buffer = NULL;
     int cur_win_size = MAX_WINDOW;
     int max_buffer_size = MAX_WINDOW;
     int cur_buffer_size = 0;
@@ -223,6 +223,13 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
             print_diag(snd_pkt, SEND);
             sendto(sockfd, snd_pkt, sizeof(packet) + MAX_PAYLOAD, 0, 
                 (struct sockaddr*) addr, addr_size);
+
+            // add to buffer
+            // TODO: check if length > 0? do we need to retransmit ACKs that are lost? 
+            insert_packet(&s_buffer, snd_pkt);
+            // print("OBSERVE THE SEND BUFFER:");
+            // print_list(&s_buffer);
+
             next_seq++;
             ack_data = 0;
             cur_buffer_size += n;

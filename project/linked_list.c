@@ -6,7 +6,7 @@
 #include "consts.h"
 
 void insert_packet(struct Node** head, packet* pkt) {
-    struct Node* new_node = (struct Node*) malloc(sizeof(struct Node));
+    struct Node* new_node = (struct Node*) malloc(sizeof(struct Node) + ntohs(pkt->length));
     // because we are converting, we must restore endianness when extracting
     new_node->seq_num = ntohs(pkt->seq);
     new_node->ack_num = ntohs(pkt->ack);
@@ -19,6 +19,7 @@ void insert_packet(struct Node** head, packet* pkt) {
     
     if (cur_node == NULL || cur_node->seq_num > new_node->seq_num) {
         new_node->next = cur_node;
+        *head = new_node;
         return;
     }
 
