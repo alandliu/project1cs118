@@ -74,6 +74,14 @@ void free_up_to(struct Node** head, int16_t target_seq) {
     *head = cur_node;
 }
 
+int retrieve_head_packet(struct Node** head, packet* t_pkt) {
+    struct Node* cur_node = *head;
+    if (cur_node == NULL) return 0;
+    
+    int16_t t_seq = cur_node->seq_num;
+    return retrieve_packet(head, t_pkt, t_seq);
+}
+
 int retrieve_packet(struct Node** head, packet* t_pkt, int16_t target_seq) {
     struct Node* cur_node = *head;
     while (cur_node != NULL && cur_node->seq_num != target_seq) {
