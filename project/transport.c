@@ -113,6 +113,15 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
 
     printf("Next seq will be %d\n", next_seq);
     printf("Acked up to %d\n", cum_ack);
+
+    // init buffers
+    // note:
+    // 1. buffers account for headers, and must be stored
+    // 2. flow control integer does not count header sie
+    int8_t sending_buf[(sizeof(packet) + MAX_PAYLOAD) * 40] = {0};
+    int8_t receiving_buf[(sizeof(packet) + MAX_PAYLOAD) * 40] = {0};
+    int max_buffer_size = MIN_WINDOW;
+    int cur_buffer_size = 0;
     // loop
     while (true) {
         uint8_t rcv_buffer[sizeof(packet) + MAX_PAYLOAD] = {0};
