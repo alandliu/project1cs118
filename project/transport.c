@@ -133,6 +133,9 @@ void three_way_hs(int sockfd, struct sockaddr_in* addr, int type,
             packet* rcv_ack = (packet*) buf;
             int bytes_recvd = recvfrom(sockfd, &buf, sizeof(packet) + MAX_PAYLOAD,
                                         0, (struct sockaddr*) addr, &s);
+            if (ntohs(rcv_ack->length)) {
+                output_p(rcv_ack->payload, ntohs(rcv_ack->length));
+            }
             print_diag(rcv_ack, RECV);
             *next_seq = ntohs(syn_ack_pkt->seq) + 1;
             *cum_ack = ntohs(rcv_ack->seq) + 1;
@@ -146,8 +149,8 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                  void (*output_p)(uint8_t*, size_t)) {
 
     // initiate connection
-    // next seq is the next sequence number that should be reecived
-    // cum ack is the last byte that has been acked of the sender
+    // next seq is the next sequence number that we should send to other end host
+    // next ack is the next byte expected from other end host
     int16_t init_seq, next_seq, next_ack;
     three_way_hs(sockfd, addr, type, input_p, output_p, &init_seq, &next_ack);
     next_seq = init_seq;
@@ -169,6 +172,8 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
     int max_win_size = MAX_WINDOW;
     int max_buffer_size = MAX_WINDOW;
     int cur_buffer_size = 0;
+
+    // int i_test = 1;
     // loop
     while (true) {
         uint8_t rcv_buffer[MAX_PACKET_SIZE] = {0};
@@ -197,27 +202,26 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                         ack_data = 1;
                         output_p(rcv_pkt->payload, len);
                     }
-                    // TODO: start checking for other packets with seq_num + 1 and print if there
+                    // start checking for other packets with seq_num + 1 and print if there
                     int8_t t_buf[MAX_PACKET_SIZE] = {0};
                     packet* t_packet = (packet*) t_buf;
                     int output_io_packets_in_buf = retrieve_packet(&r_buffer, t_packet, next_ack);
                     while (output_io_packets_in_buf) {
-                        output_p(t_packet, ntohs(t_packet->length));
+                        output_p(t_packet->payload, ntohs(t_packet->length));
                         next_ack++;
                         output_io_packets_in_buf = retrieve_packet(&r_buffer, t_packet, next_ack);
                     }
                     free_up_to(&r_buffer, next_ack);
                 } else if (s_num < next_ack) {
-                    // if received s_num less than cum ack, ack with cum ack
+                    // if received s_num less than cum ack, ack with current expected ack
                     ack_data = 1;
                 } else if (s_num > next_ack) {
                     // TODO: test. manually plant out of order packet.
                     insert_packet(&r_buffer, rcv_pkt);
                 }
 
-                // TODO: we must remove all packets up to the ACKed packet
-                // consider writing the following function:
-                // free_up_to(&snd_buffer, ack_num);
+                // we must remove all packets up to the ACKed packet
+                free_up_to(&s_buffer, a_num);
             } else {
                 print("CORRUPT");
             }
@@ -236,6 +240,13 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
             memcpy(snd_pkt->payload, msg, n);
             snd_pkt->length = htons(n);
 
+            // this code purposefully misplaces packets
+            // printf("iter is: %d\n", i_test);
+            // if (i_test % 5 == 0) {
+            //     snd_pkt->seq = htons(next_seq+1);
+            //     next_seq--;
+            // }
+
             set_parity(snd_pkt); // must be last
 
             print_diag(snd_pkt, SEND);
@@ -243,7 +254,7 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                 (struct sockaddr*) addr, addr_size);
 
             // add to buffer
-            // TODO: check if length > 0? do we need to retransmit ACKs that are lost? 
+            // if there is data, buffer it in send buffer
             if (n > 0) {
                 insert_packet(&s_buffer, snd_pkt);
             }
@@ -252,6 +263,7 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
 
             next_seq++;
             ack_data = 0;
+            // i_test++;
         }
     }
 }
