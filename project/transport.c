@@ -172,6 +172,9 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
     int max_win_size = MAX_WINDOW;
     int max_buffer_size = MAX_WINDOW;
     int cur_buffer_size = 0;
+    struct timeval start, end;
+    int timer_on = 0;
+    int prev_seq = 0;
 
     // int i_test = 1;
     // loop
@@ -181,6 +184,24 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
         uint8_t msg[MAX_PAYLOAD] = {0};
         uint8_t ack_data = 0;
         socklen_t addr_size = sizeof(struct sockaddr_in);
+
+        gettimeofday(&end, NULL);
+        if (timer_on && TV_DIFF(end, start) >= RTO){
+            print("need retrans");
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d", prev_seq);
+            print(buf);
+            // print(prev_seq);
+            // print("retrans");
+            int8_t rt_buf[MAX_PACKET_SIZE] = {0};
+            packet* rt_packet = (packet*) rt_buf;
+            int rthead = retrieve_head_packet(&s_buffer, rt_packet);
+            if (rthead){
+                sendto(sockfd, rt_packet, sizeof(packet) + MAX_PAYLOAD, 0, 
+                (struct sockaddr*) addr, addr_size);
+            }
+            gettimeofday(&start, NULL);
+        }
 
         int bytes_recvd = recvfrom(sockfd, rcv_buffer, sizeof(packet) + MAX_PAYLOAD,
                                     0, (struct sockaddr*) addr, 
@@ -221,7 +242,19 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
                 }
 
                 // we must remove all packets up to the ACKed packet
+                // Remove all packets up to a_num and update the timer accordingly
                 free_up_to(&s_buffer, a_num);
+                if (s_buffer == NULL) {
+                    timer_on = 0;  // No outstanding packets, so disable the timer.
+                } else {
+                    // Reset the timer for the new head packet
+                    timer_on = 1;
+                    gettimeofday(&start, NULL);
+                    // Optionally, update prev_seq to reflect the new head packet's sequence.
+                    prev_seq = s_buffer->seq_num;
+                }
+
+            
             } else {
                 print("CORRUPT");
             }
@@ -257,9 +290,24 @@ void listen_loop(int sockfd, struct sockaddr_in* addr, int type,
             // if there is data, buffer it in send buffer
             if (n > 0) {
                 insert_packet(&s_buffer, snd_pkt);
+                if (timer_on == 0){
+                    print("retrans timer start");
+                    char buf[16];
+                    snprintf(buf, sizeof(buf), "%d", s_buffer->seq_num);
+                    print(buf);
+
+                    gettimeofday(&start, NULL);
+                    timer_on = 1;
+                    prev_seq = s_buffer->seq_num;
+                }
             }
             // print("OBSERVE THE SEND BUFFER:");
             // print_list(&s_buffer);
+
+            // if (s_buffer == NULL){
+                
+            //     // prev_seq = s_buffer->seq_num;
+            // }
 
             next_seq++;
             ack_data = 0;
