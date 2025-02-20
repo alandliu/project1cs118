@@ -268,7 +268,7 @@ void listen_loop(int sockfd, struct sockaddr_in *addr, int type,
                     // snprintf(buf1, sizeof(buf1), "%d", s_buffer->seq_num);
                     // print(buf1);
 
-                    free_up_to(&s_buffer, a_num);
+                    free_up_to(&s_buffer, a_num-1);
                     if (s_buffer == NULL)
                     {
                         timer_on = 0; // No outstanding packets, so disable the timer.
