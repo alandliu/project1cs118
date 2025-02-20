@@ -178,8 +178,8 @@ void listen_loop(int sockfd, struct sockaddr_in *addr, int type,
     flags |= O_NONBLOCK;
     fcntl(sockfd, F_SETFL, flags);
 
-    printf("Next seq will be %d\n", next_seq);
-    printf("Acked up to %d\n", next_ack - 1);
+    // printf("Next seq will be %d\n", next_seq);
+    // printf("Acked up to %d\n", next_ack - 1);
 
     // init buffers
     // note:
@@ -203,8 +203,6 @@ void listen_loop(int sockfd, struct sockaddr_in *addr, int type,
         uint8_t msg[MAX_PAYLOAD] = {0};
         uint8_t ack_data = 0;
         socklen_t addr_size = sizeof(struct sockaddr_in);
-
-        
 
         int bytes_recvd = recvfrom(sockfd, rcv_buffer, sizeof(packet) + MAX_PAYLOAD,
                                    0, (struct sockaddr *)addr,
@@ -255,20 +253,11 @@ void listen_loop(int sockfd, struct sockaddr_in *addr, int type,
 
                 // we must remove all packets up to the ACKed packet
                 // Remove all packets up to a_num and update the timer accordingly
-               
-                // snprintf(buf, sizeof(buf), "%d", s_buffer->seq_num);
-                // print(buf);
-                if (s_buffer != NULL && a_num >= s_buffer->seq_num)
-                {
-                    // print("acknowledged old packet");
-                    // char buf[16];
-                    // snprintf(buf, sizeof(buf), "%d", a_num);
-                    // print(buf);
-                    // char buf1[16];
-                    // snprintf(buf1, sizeof(buf1), "%d", s_buffer->seq_num);
-                    // print(buf1);
 
-                    free_up_to(&s_buffer, a_num-1);
+                if (s_buffer != NULL && a_num >= prev_seq)
+                {
+
+                    free_up_to(&s_buffer, a_num - 1);
                     if (s_buffer == NULL)
                     {
                         timer_on = 0; // No outstanding packets, so disable the timer.
@@ -330,11 +319,12 @@ void listen_loop(int sockfd, struct sockaddr_in *addr, int type,
 
                 //     gettimeofday(&start, NULL);
                 //     timer_on = 1;
-                    
+
                 // }
             }
 
-            if (!timer_on && s_buffer != NULL){
+            if (!timer_on && s_buffer != NULL)
+            {
                 gettimeofday(&start, NULL);
                 timer_on = 1;
                 prev_seq = s_buffer->seq_num;
@@ -355,12 +345,12 @@ void listen_loop(int sockfd, struct sockaddr_in *addr, int type,
         gettimeofday(&end, NULL);
         if (timer_on && TV_DIFF(end, start) >= RTO)
         {
-            print("need retrans");
-            print("our next ack is ");
-            // print(next_ack);
-            char buf[16];
-            snprintf(buf, sizeof(buf), "%d", next_ack);
-            print(buf);
+            // print("need retrans");
+            // // print("our next ack is ");
+            // // print(next_ack);
+            // char buf[16];
+            // snprintf(buf, sizeof(buf), "%d", prev_seq);
+            // print(buf);
             // print(prev_seq);
             // print("retrans");
             uint8_t rt_buffer[MAX_PACKET_SIZE] = {0};
@@ -376,7 +366,6 @@ void listen_loop(int sockfd, struct sockaddr_in *addr, int type,
             print_diag(rt_pkt, SEND);
             sendto(sockfd, rt_pkt, sizeof(packet) + MAX_PAYLOAD, 0,
                    (struct sockaddr *)addr, addr_size);
-
 
             // retransmission
             // int8_t rt_buf[MAX_PACKET_SIZE] = {0};

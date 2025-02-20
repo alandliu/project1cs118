@@ -20,6 +20,7 @@
 #define MIN_WINDOW MAX_PAYLOAD
 #define MAX_WINDOW MAX_PAYLOAD * 40
 #define DUP_ACKS 3
+#define INITIAL_WIN_SIZE 1012
 
 // States
 #define SERVER 0
